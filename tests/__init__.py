@@ -1,2 +1,2 @@
-"""Test suite for soccer analytics data engineering pipeline."""
+"""Test suite for soccer analytics engineering pipeline."""
 

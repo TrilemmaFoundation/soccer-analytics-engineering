@@ -1,6 +1,6 @@
 # Engineering Specification
 
-This document provides technical details on data sources, assumptions, modeling choices, and data quality considerations for the Soccer Analytics repository.
+This document provides technical details on data sources, assumptions, modeling choices, and data quality considerations for the Soccer Analytics Engineering repository.
 
 ## Data Sources
 

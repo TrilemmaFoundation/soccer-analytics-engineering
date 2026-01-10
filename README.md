@@ -1,6 +1,6 @@
-# Soccer Analytics: Data Engineering ⚽️
+# Soccer Analytics Engineering ⚽️
 
-Welcome to the **Soccer Analytics** data engineering repository. This project focuses on building a high-performance, normalized analytical database from [StatsBomb Open Data](https://github.com/statsbomb/open-data) using DuckDB.
+Welcome to the **Soccer Analytics Engineering** repository. This project focuses on building a high-performance, normalized analytical database from [StatsBomb Open Data](https://github.com/statsbomb/open-data) using DuckDB.
 
 ---
 
