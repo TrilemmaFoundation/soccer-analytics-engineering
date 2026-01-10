@@ -1,0 +1,26 @@
+# environment
+bin
+include
+lib
+pyvenv.cfg
+
+# data
+open-data
+stats.db
+stats.db-journal
+stats.duckdb
+stats.duckdb-journal
+stats.duckdb-shm
+stats.duckdb-wal
+
+# build cache
+__pycache__
+*.db-shm
+*.db-wal
+*.db
+*.duckdb
+*.duckdb-shm
+*.duckdb-wal
+*.duckdb-journal
+
+/venv

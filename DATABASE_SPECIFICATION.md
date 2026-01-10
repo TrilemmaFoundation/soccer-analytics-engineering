@@ -1,0 +1,467 @@
+# StatsBomb DuckDB Database Specification
+
+## Overview
+
+This document provides a comprehensive specification for the StatsBomb DuckDB database (`stats.duckdb`), which contains football/soccer event data from [StatsBomb Open Data](https://github.com/statsbomb/open-data) in a normalized, queryable format.
+
+### Database Details
+
+- **Format**: DuckDB
+- **Database File**: `stats.duckdb` (created by `build.py`)
+- **Data Source**: StatsBomb Open Data repository
+- **License**: CC BY-NC 4.0 (Creative Commons Attribution-NonCommercial)
+- **Schema Version**: Defined in `schema.py`
+
+## Database Schema
+
+### Core Tables
+
+#### 1. `competitions` - Competition Metadata
+
+**Purpose**: Stores competition and season information
+
+| Column                | Type    | Constraints                    | Description                    |
+| --------------------- | ------- | ------------------------------ | ------------------------------ |
+| `competition_id`      | INTEGER | PRIMARY KEY                    | Unique competition identifier  |
+| `season_id`           | INTEGER | PRIMARY KEY                    | Unique season identifier       |
+| `name`                | TEXT    |                                | Competition name               |
+| `gender`              | TEXT    |                                | Competition gender (male/female) |
+| `is_youth`            | BOOLEAN |                                | Youth competition flag         |
+| `is_international`    | BOOLEAN |                                | International competition flag |
+
+**Primary Key**: (`competition_id`, `season_id`)
+
+#### 2. `matches` - Match Metadata
+
+**Purpose**: Stores match information and results
+
+| Column                  | Type    | Constraints | Description                  |
+| ----------------------- | ------- | ----------- | ---------------------------- |
+| `match_id`              | INTEGER | PRIMARY KEY | Unique match identifier      |
+| `match_date`            | TEXT    |             | Match date (YYYY-MM-DD)      |
+| `match_week`            | INTEGER |             | Match week number            |
+| `match_status`          | TEXT    |             | Data availability status     |
+| `match_status_360`      | TEXT    |             | 360° data availability       |
+| `kickoff`               | TEXT    |             | Kick-off time (HH:MM:SS.sss) |
+| `home_score`            | INTEGER |             | Final home team score        |
+| `away_score`            | INTEGER |             | Final away team score        |
+| `competition_id`        | INTEGER | FOREIGN KEY | References competitions      |
+| `competition`           | TEXT    |             | Competition name             |
+| `competition_stage`     | TEXT    |             | Competition stage            |
+| `season_id`             | INTEGER | FOREIGN KEY | References competitions      |
+| `season`                | TEXT    |             | Season identifier            |
+| `home_team_id`          | INTEGER | FOREIGN KEY | References teams            |
+| `home_team`             | TEXT    |             | Home team name               |
+| `home_managers`         | TEXT    |             | Home team managers (JSON)    |
+| `away_team_id`          | INTEGER | FOREIGN KEY | References teams            |
+| `away_team`             | TEXT    |             | Away team name               |
+| `away_managers`         | TEXT    |             | Away team managers (JSON)    |
+| `stadium_id`            | INTEGER |             | Stadium identifier           |
+| `stadium`               | TEXT    |             | Stadium name                 |
+| `referee_id`            | INTEGER |             | Referee identifier           |
+| `referee`               | TEXT    |             | Referee name                 |
+| `last_updated`          | TEXT    |             | Last data update timestamp   |
+| `last_updated_360`      | TEXT    |             | Last 360° data update        |
+| `data_version`          | TEXT    |             | StatsBomb data version       |
+| `shot_fidelity_version` | TEXT    |             | Shot data version            |
+| `xy_fidelity_version`   | TEXT    |             | Position data version        |
+
+**Foreign Keys**: 
+- (`competition_id`, `season_id`) → `competitions`
+- `home_team_id` → `teams`
+- `away_team_id` → `teams`
+
+#### 3. `teams` - Team Information
+
+**Purpose**: Stores team metadata
+
+| Column | Type    | Constraints | Description |
+| ------ | ------- | ----------- | ----------- |
+| `id`   | INTEGER | PRIMARY KEY | Team ID     |
+| `name` | TEXT    |             | Team name   |
+| `gender` | TEXT  |             | Team gender |
+
+#### 4. `event_types` - Event Type Lookup
+
+**Purpose**: Maps event type IDs to names
+
+| Column | Type    | Constraints | Description           |
+| ------ | ------- | ----------- | --------------------- |
+| `id`   | INTEGER | PRIMARY KEY | Event type ID         |
+| `name` | TEXT    |             | Event type name       |
+
+Common event types include: Pass, Shot, Carry, Dribble, Pressure, Ball Recovery, Duel, Clearance, Block, Goal Keeper, etc.
+
+#### 5. `players` - Player Information
+
+**Purpose**: Stores player metadata
+
+| Column | Type    | Constraints | Description |
+| ------ | ------- | ----------- | ----------- |
+| `id`   | INTEGER | PRIMARY KEY | Player ID   |
+| `name` | TEXT    |             | Player name |
+
+#### 6. `positions` - Position Lookup
+
+**Purpose**: Maps position IDs to names
+
+| Column | Type    | Constraints | Description     |
+| ------ | ------- | ----------- | --------------- |
+| `id`   | INTEGER | PRIMARY KEY | Position ID     |
+| `name` | TEXT    |             | Position name   |
+
+#### 7. `play_patterns` - Play Pattern Lookup
+
+**Purpose**: Maps play pattern IDs to names
+
+| Column | Type    | Constraints | Description        |
+| ------ | ------- | ----------- | ------------------ |
+| `id`   | INTEGER | PRIMARY KEY | Play pattern ID    |
+| `name` | TEXT    |             | Play pattern name   |
+
+#### 8. `events` - Match Events
+
+**Purpose**: Detailed event data for all matches (passes, shots, tackles, etc.)
+
+##### Core Event Fields
+
+| Column               | Type    | Constraints | Description                                 |
+| -------------------- | ------- | ----------- | ------------------------------------------- |
+| `id`                 | TEXT    | PRIMARY KEY | Unique event identifier                     |
+| `index_num`          | INTEGER |             | Event sequence number in match              |
+| `period`             | INTEGER |             | Match period (1=1st half, 2=2nd half, etc.) |
+| `minute`             | INTEGER |             | Minute of occurrence                        |
+| `second`             | INTEGER |             | Second of occurrence                        |
+| `timestamp`          | TEXT    |             | Precise timestamp (MM:SS.sss)               |
+| `duration`           | REAL    |             | Event duration (seconds)                    |
+| `location`           | TEXT    |             | Event coordinates [x, y] (JSON)            |
+| `location_x`         | REAL    |             | X coordinate (yards)                        |
+| `location_y`         | REAL    |             | Y coordinate (yards)                        |
+| `possession`         | INTEGER |             | Possession sequence number                  |
+| `possession_team_id` | INTEGER | FOREIGN KEY | Team ID in possession                       |
+| `possession_team`    | TEXT    |             | Team name in possession                     |
+| `out`                | BOOLEAN |             | Ball out of play flag                       |
+| `off_camera`         | BOOLEAN |             | Event off camera flag                       |
+| `counterpress`       | BOOLEAN |             | Counterpress flag                           |
+| `under_pressure`     | BOOLEAN |             | Under pressure flag                         |
+| `type_id`            | INTEGER | FOREIGN KEY | References event_types                      |
+| `type`               | TEXT    |             | Event type name                             |
+| `match_id`           | INTEGER | FOREIGN KEY | References matches                          |
+| `team_id`            | INTEGER | FOREIGN KEY | References teams                            |
+| `team`               | TEXT    |             | Team performing action                      |
+| `player_id`          | INTEGER | FOREIGN KEY | References players                          |
+| `player`             | TEXT    |             | Player name                                 |
+| `position_id`        | INTEGER | FOREIGN KEY | References positions                        |
+| `position`           | TEXT    |             | Player position                             |
+| `play_pattern_id`    | INTEGER | FOREIGN KEY | References play_patterns                     |
+| `play_pattern`       | TEXT    |             | Play pattern name                           |
+
+##### Shot-Specific Fields
+
+| Column                  | Type        | Description                              |
+| ----------------------- | ----------- | ---------------------------------------- |
+| `shot_end_location`     | TEXT (JSON) | Shot target [x, y, z]                    |
+| `shot_statsbomb_xg`     | REAL        | Expected goals value (0.0-1.0)           |
+| `shot_outcome`          | TEXT        | Shot result (Goal, Saved, Blocked, etc.) |
+| `shot_technique`        | TEXT        | Shot technique (Normal, Volley, etc.)    |
+| `shot_body_part`        | TEXT        | Body part used                           |
+| `shot_type`             | TEXT        | Shot type (Open Play, Penalty, etc.)     |
+| `shot_key_pass_id`      | TEXT        | Key pass ID                              |
+| `shot_freeze_frame`     | TEXT (JSON) | Player positions at shot moment          |
+| `shot_first_time`       | BOOLEAN     | First time shot flag                     |
+| `shot_deflected`        | BOOLEAN     | Deflection flag                          |
+| `shot_aerial_won`       | BOOLEAN     | Aerial duel won flag                     |
+| `shot_follows_dribble`  | BOOLEAN     | Follows dribble flag                     |
+| `shot_one_on_one`       | BOOLEAN     | One-on-one situation flag                |
+| `shot_open_goal`        | BOOLEAN     | Open goal flag                           |
+| `shot_redirect`         | BOOLEAN     | Redirect flag                            |
+| `shot_saved_off_target` | BOOLEAN     | Saved off target flag                     |
+| `shot_saved_to_post`    | BOOLEAN     | Saved to post flag                       |
+
+##### Pass-Specific Fields
+
+| Column                  | Type        | Description                                        |
+| ----------------------- | ----------- | -------------------------------------------------- |
+| `pass_end_location`     | TEXT (JSON) | Pass destination [x, y]                            |
+| `pass_end_location_x`   | REAL        | Pass end X coordinate                              |
+| `pass_end_location_y`   | REAL        | Pass end Y coordinate                              |
+| `pass_recipient_id`     | INTEGER     | Receiving player ID                                |
+| `pass_recipient`        | TEXT        | Receiving player name                              |
+| `pass_length`           | REAL        | Pass distance (yards)                              |
+| `pass_angle`            | REAL        | Pass angle (radians)                               |
+| `pass_height`           | TEXT        | Pass height (Ground Pass, High Pass, Low Pass)     |
+| `pass_body_part`        | TEXT        | Body part used (Left Foot, Right Foot, Head, etc.) |
+| `pass_type`             | TEXT        | Pass type (Corner, Throw-in, Free Kick, etc.)      |
+| `pass_outcome`          | TEXT        | Pass result (Incomplete, Out, etc.)                |
+| `pass_technique`        | TEXT        | Pass technique (Inswinging, Outswinging, etc.)     |
+| `pass_assisted_shot_id` | TEXT        | Linked shot ID if assist                           |
+| `pass_goal_assist`      | BOOLEAN     | Goal assist flag                                   |
+| `pass_shot_assist`      | BOOLEAN     | Shot assist flag                                   |
+| `pass_cross`            | BOOLEAN     | Cross flag                                         |
+| `pass_switch`           | BOOLEAN     | Switch play flag                                   |
+| `pass_through_ball`     | BOOLEAN     | Through ball flag                                  |
+| `pass_aerial_won`       | BOOLEAN     | Aerial duel won flag                               |
+| `pass_deflected`        | BOOLEAN     | Deflection flag                                    |
+| `pass_inswinging`       | BOOLEAN     | Inswinging flag                                    |
+| `pass_outswinging`      | BOOLEAN     | Outswinging flag                                   |
+| `pass_no_touch`         | BOOLEAN     | No touch flag                                      |
+| `pass_cut_back`         | BOOLEAN     | Cut back flag                                      |
+| `pass_straight`         | BOOLEAN     | Straight pass flag                                 |
+| `pass_miscommunication` | BOOLEAN    | Miscommunication flag                              |
+
+##### Carry-Specific Fields
+
+| Column                  | Type        | Description                 |
+| ----------------------- | ----------- | --------------------------- |
+| `carry_end_location`     | TEXT (JSON) | Carry destination [x, y]    |
+| `carry_end_location_x`  | REAL        | Carry end X coordinate      |
+| `carry_end_location_y`  | REAL        | Carry end Y coordinate      |
+
+**Foreign Keys**:
+- `type_id` → `event_types(id)`
+- `match_id` → `matches(match_id)`
+- `team_id` → `teams(id)`
+- `player_id` → `players(id)`
+- `position_id` → `positions(id)`
+- `possession_team_id` → `teams(id)`
+- `pass_recipient_id` → `players(id)`
+
+## Data Types and Conventions
+
+### Coordinate System
+
+- **Field Dimensions**: 120 yards (width) × 80 yards (height)
+- **Origin**: Bottom-left corner (0, 0)
+- **Goals**: Located at x=0 (left goal) and x=120 (right goal)
+- **Format**: JSON arrays `[x, y]` for 2D, `[x, y, z]` for 3D (shots)
+- **Extracted Coordinates**: `location_x`, `location_y` columns provide direct numeric access
+
+### JSON Fields
+
+All JSON fields are stored as TEXT and can be parsed using DuckDB's JSON functions:
+
+```sql
+-- Extract x coordinate
+json_extract(location, '$[0]')
+
+-- Extract y coordinate
+json_extract(location, '$[1]')
+
+-- Extract z coordinate (shots)
+json_extract(shot_end_location, '$[2]')
+```
+
+### Boolean Fields
+
+All boolean values are stored as BOOLEAN type:
+- `0` or `NULL` = False/No
+- `1` = True/Yes
+
+## Indexes
+
+The database includes 7 indexes created by `schema.create_indexes()` to optimize query performance:
+
+### Events Table Indexes
+
+| Index Name | Columns | Purpose |
+|------------|---------|---------|
+| `idx_events_match` | `match_id` | Fast filtering by match |
+| `idx_events_player` | `player_id` | Fast player-based queries |
+| `idx_events_type` | `type_id` | Fast filtering by event type |
+| `idx_events_team` | `team_id` | Fast team-based queries |
+
+### Matches Table Indexes
+
+| Index Name | Columns | Purpose |
+|------------|---------|---------|
+| `idx_matches_competition` | `competition_id`, `season_id` | Fast filtering by competition/season |
+| `idx_matches_home_team` | `home_team_id` | Fast home team lookups |
+| `idx_matches_away_team` | `away_team_id` | Fast away team lookups |
+
+These indexes are automatically created during the database build process and significantly improve query performance for common access patterns.
+
+## Player Canonicalization
+
+To ensure consistency in player names across the database, certain player names are canonicalized during the build process. This handles cases where StatsBomb data may have inconsistent name formatting or special characters.
+
+### Canonicalized Players
+
+The following player IDs have standardized names applied:
+
+| Player ID | Canonicalized Name |
+|-----------|-------------------|
+| 4354 | Philip Foden |
+| 25742 | Karly Roestbakken |
+| 25546 | Cheyna Lee Matthews |
+| 4951 | Quinn |
+| 5082 | Marta Vieira da Silva |
+| 18617 | Mykola Matviyenko |
+| 3961 | N'Golo Kanté |
+| 5659 | Khadim N'Diaye |
+| 401453 | David Ngog |
+| 184468 | Álvaro Zamora |
+
+### Implementation
+
+Canonicalization is applied in two places during `build.py`:
+
+1. **Players table**: When inserting into the `players` table, player names are normalized using a CASE statement that maps player IDs to their canonical names.
+
+2. **Events table**: When inserting events, the `player` field (denormalized name) is also canonicalized to match the players table.
+
+This ensures that:
+- Player names are consistent across all tables
+- Queries filtering by player name will work correctly
+- Player aggregations will not be split due to name variations
+
+The canonicalization mapping is defined in `build.py` and can be extended as needed when new name inconsistencies are discovered.
+
+## Query Examples
+
+### Basic Queries
+
+#### Get match information
+
+```sql
+SELECT home_team, away_team, home_score, away_score, match_date, competition, season
+FROM matches
+ORDER BY match_date;
+```
+
+#### Count events by type
+
+```sql
+SELECT type, COUNT(*) as count
+FROM events
+GROUP BY type
+ORDER BY count DESC;
+```
+
+#### Find all goals
+
+```sql
+SELECT player, team, minute, second, shot_statsbomb_xg
+FROM events
+WHERE type = 'Shot' AND shot_outcome = 'Goal'
+ORDER BY match_id, minute, second;
+```
+
+### Advanced Analytics
+
+#### Top goal scorers
+
+```sql
+SELECT
+    player,
+    team,
+    COUNT(*) as goals,
+    AVG(shot_statsbomb_xg) as avg_xg
+FROM events
+WHERE type = 'Shot' AND shot_outcome = 'Goal'
+GROUP BY player, team
+ORDER BY goals DESC, avg_xg DESC;
+```
+
+#### Pass completion rates by team
+
+```sql
+SELECT
+    team,
+    COUNT(*) as total_passes,
+    SUM(CASE WHEN pass_outcome IS NULL THEN 1 ELSE 0 END) as completed_passes,
+    ROUND(SUM(CASE WHEN pass_outcome IS NULL THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) as completion_rate
+FROM events
+WHERE type = 'Pass'
+GROUP BY team
+ORDER BY completion_rate DESC;
+```
+
+#### Heat map data for a player
+
+```sql
+SELECT
+    location_x as x,
+    location_y as y,
+    COUNT(*) as event_count
+FROM events
+WHERE player = 'Player Name'
+AND location_x IS NOT NULL
+AND location_y IS NOT NULL
+GROUP BY x, y
+ORDER BY event_count DESC;
+```
+
+## Performance Considerations
+
+### Query Optimization
+
+- **Use indexes**: The database includes 7 indexes on frequently queried columns (see [Indexes](#indexes) section above). Filter on indexed columns (`match_id`, `type_id`, `player_id`, `team_id`) when possible
+- **Filter early**: Apply WHERE clauses before JOINs and aggregations
+- **Coordinate efficiency**: Use extracted coordinate columns (`location_x`, `location_y`) instead of JSON extraction when available
+- **Consider query result caching**: For complex analytics that are run repeatedly
+
+### Memory Usage
+
+- DuckDB loads database pages into memory as needed
+- Large result sets may require chunking
+- JSON extraction can be memory intensive for large datasets
+- Consider using LIMIT clauses for exploration queries
+
+## Data Quality and Validation
+
+### Data Integrity Checks
+
+```sql
+-- Check for orphaned events
+SELECT COUNT(*) FROM events e
+LEFT JOIN matches m ON e.match_id = m.match_id
+WHERE m.match_id IS NULL;
+
+-- Validate coordinate ranges
+SELECT COUNT(*) FROM events
+WHERE location_x < 0 OR location_x > 120
+   OR location_y < 0 OR location_y > 80;
+
+-- Check xG value ranges
+SELECT MIN(shot_statsbomb_xg), MAX(shot_statsbomb_xg), AVG(shot_statsbomb_xg)
+FROM events
+WHERE shot_statsbomb_xg IS NOT NULL;
+```
+
+## Usage Guidelines
+
+### Best Practices
+
+1. **Always use indexes**: Filter on indexed columns (match_id, type, player_id) when possible
+2. **Coordinate efficiency**: Use `location_x` and `location_y` columns instead of JSON extraction when available
+3. **Coordinate validation**: Check coordinate bounds (0-120, 0-80) for spatial analysis
+4. **Time analysis**: Combine minute and second for precise timing
+5. **Memory management**: Use LIMIT clauses for large queries
+6. **Data validation**: Always check for NULL values in optional fields
+
+### Common Pitfalls
+
+1. **Boolean interpretation**: Remember boolean encoding for flag fields
+2. **NULL handling**: Many optional fields are NULL, not empty strings
+3. **Team consistency**: Team names are consistent but check for exact matches
+4. **Coordinate system**: StatsBomb coordinates differ from other providers
+5. **Event ordering**: Use `index_num` for proper event sequence
+
+## License and Attribution
+
+- **Data Source**: StatsBomb Open Data
+- **License**: CC BY-NC 4.0 (Creative Commons Attribution-NonCommercial)
+- **Usage**: Non-commercial use only, attribution required
+- **Citation**: "StatsBomb Open Data"
+
+## Building the Database
+
+The database is built using `build.py`, which:
+
+1. Reads competition metadata from `./open-data/data/competitions.json`
+2. Processes match files from `./open-data/data/matches/`
+3. Processes event files from `./open-data/data/events/`
+4. Creates normalized tables with foreign key relationships
+5. Outputs `stats.duckdb` in the root directory
+
+See the main [README.md](README.md) for setup and build instructions.
