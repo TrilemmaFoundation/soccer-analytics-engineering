@@ -147,6 +147,9 @@ The tests cover:
 - **Referential Integrity**: PK/FK consistency across all 8 tables.
 - **Data Quality**: Coordinate bounds, xG ranges, and event sequences.
 
+## 🙏 Acknowledgments
+This repository was built off of the work done by the [NYU MSDS Fall 2025 Soccer capstone team](https://github.com/TrilemmaFoundation/NYU-MSDS-F25-Soccer).
+
 ---
 
 ## 📜 License
