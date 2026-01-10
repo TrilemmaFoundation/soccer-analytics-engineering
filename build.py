@@ -1,6 +1,7 @@
 import schema
 import duckdb
 import logging
+import time
 
 # Configure logging
 logging.basicConfig(
@@ -19,9 +20,11 @@ def main():
         c = db.cursor()
         logger.info("Connected to DuckDB database: stats.duckdb")
 
+        start_time = time.time()
         setup_tables(c)
         db.commit()
-        logger.info("Database build completed successfully")
+        total_time = time.time() - start_time
+        logger.info(f"Database build completed successfully in {total_time:.2f}s")
     except Exception as e:
         logger.error(f"Error during database build: {e}", exc_info=True)
         raise
@@ -45,6 +48,7 @@ def setup_tables(c):
 
     # Load competitions
     logger.info("Loading competitions")
+    comp_start = time.time()
     c.execute("""
         INSERT INTO competitions 
         SELECT 
@@ -57,10 +61,11 @@ def setup_tables(c):
         FROM read_json_auto('./open-data/data/competitions.json');
     """)
     competition_count = c.execute("SELECT COUNT(*) FROM competitions").fetchone()[0]
-    logger.info(f"Loaded {competition_count} competitions")
+    logger.info(f"Loaded {competition_count} competitions in {time.time() - comp_start:.2f}s")
 
     # Load teams from matches (deduplicated)
     logger.info("Loading teams from matches")
+    teams_start = time.time()
     c.execute("""
         INSERT INTO teams
         SELECT DISTINCT 
@@ -80,10 +85,11 @@ def setup_tables(c):
         WHERE away_team.away_team_id IS NOT NULL;
     """)
     team_count = c.execute("SELECT COUNT(*) FROM teams").fetchone()[0]
-    logger.info(f"Loaded {team_count} teams")
+    logger.info(f"Loaded {team_count} teams in {time.time() - teams_start:.2f}s")
 
     # Load matches
     logger.info("Loading matches")
+    matches_start = time.time()
     c.execute("""
         INSERT INTO matches
         SELECT 
@@ -124,10 +130,11 @@ def setup_tables(c):
         FROM read_json_auto('./open-data/data/matches/**/*.json', format='array');
     """)
     match_count = c.execute("SELECT COUNT(*) FROM matches").fetchone()[0]
-    logger.info(f"Loaded {match_count} matches")
+    logger.info(f"Loaded {match_count} matches in {time.time() - matches_start:.2f}s")
 
     # Load reference tables from events
-    logger.info("Loading event_types, players, positions, and play_patterns from events")
+    logger.info("Loading reference tables (event_types, players, etc.) from events")
+    ref_start = time.time()
     
     # Event types
     c.execute("""
@@ -181,10 +188,11 @@ def setup_tables(c):
         WHERE player.id IS NOT NULL;
     """)
     
-    logger.info("Loaded reference tables from events")
+    logger.info(f"Loaded reference tables in {time.time() - ref_start:.2f}s")
 
     # Load events
-    logger.info("Loading events")
+    logger.info("Loading events (this may take a minute)")
+    events_start = time.time()
     # Use read_json_auto but handle optional fields by checking parent struct exists first
     c.execute("""
         INSERT INTO events
@@ -296,12 +304,13 @@ def setup_tables(c):
         FROM read_json_auto('./open-data/data/events/*.json', format='array', filename=true);
     """)
     event_count = c.execute("SELECT COUNT(*) FROM events").fetchone()[0]
-    logger.info(f"Loaded {event_count} events")
+    logger.info(f"Loaded {event_count} events in {time.time() - events_start:.2f}s")
 
     # Create indexes
     logger.info("Creating indexes")
+    idx_start = time.time()
     schema.create_indexes(c)
-    logger.info("Indexes created successfully")
+    logger.info(f"Indexes created successfully in {time.time() - idx_start:.2f}s")
 
 
 if __name__ == "__main__":

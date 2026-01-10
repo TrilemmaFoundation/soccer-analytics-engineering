@@ -79,7 +79,7 @@ pip install -r requirements.txt
 ### 3. Data Acquisition
 ```bash
 # Clone the StatsBomb open-data repository (this takes a few minutes)
-git clone https://github.com/statsbomb/open-data.git
+git clone --depth 1 https://github.com/statsbomb/open-data.git
 ```
 
 ### 4. Build the Database
