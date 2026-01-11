@@ -36,6 +36,19 @@ def main():
 
 def setup_tables(c):
     # =========================================================================
+    # Phase 0: Drop existing tables (to handle FK dependencies)
+    # =========================================================================
+    logger.info("Cleaning up existing database tables")
+    tables = [
+        "three_sixty_positions", "three_sixty_frames", "lineup_cards", 
+        "lineup_positions", "lineup_players", "lineups", "events", 
+        "matches", "competitions", "teams", "event_types", 
+        "players", "positions", "play_patterns", "countries"
+    ]
+    for table in tables:
+        c.execute(f"DROP TABLE IF EXISTS {table} CASCADE;")
+
+    # =========================================================================
     # Phase 1: Create all tables
     # =========================================================================
     logger.info("Creating database tables")
@@ -91,17 +104,8 @@ def setup_tables(c):
     logger.info("Loading reference tables (event_types, players, positions, etc.)")
     ref_start = time.time()
     
-    # Event types
-    schema.load_event_types(c)
-    
-    # Positions
-    schema.load_positions(c)
-    
-    # Play patterns
-    schema.load_play_patterns(c)
-    
-    # Players (with canonicalization)
-    schema.load_players(c)
+    # Combined reference data (event_types, positions, play_patterns, players)
+    schema.load_reference_data(c)
     
     # Countries (from lineups)
     countries_count = schema.load_countries(c)

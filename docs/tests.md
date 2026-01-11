@@ -1,6 +1,6 @@
 # Soccer Analytics Engineering - Test Specification Summary
 
-This document provides a comprehensive overview of the testing suite for the Soccer Analytics Engineering project. The tests ensure data integrity, quality, and business logic correctness across the DuckDB-based StatsBomb data warehouse.
+This document provides a comprehensive overview of the testing suite for the Soccer Analytics Engineering project. The suite currently consists of **488 tests** ensuring data integrity, quality, and business logic correctness across the DuckDB-based StatsBomb data warehouse.
 
 ## 1. Core Database Schema & Resilience
 Ensures the database is correctly structured and the ETL process is robust.
@@ -21,17 +21,19 @@ Validates that connections between tables are unbroken and data is consistent.
 | | `TestForeignKeys` | Ensures every match points to a valid competition, every event to a valid player, etc. |
 | | `TestDataConsistency` | Checks that team and player names are consistent across related tables. |
 | `test_data_validation.py` | `TestCrossTableRelationship` | Deep validation of relationships like every match having events and valid position lookups. |
+| `test_detailed_validation.py` | `TestDetailedMatchValidation` | Cross-verifies assist teams and ensures period markers (Half Start/End) are consistent. |
 
-## 3. Data Quality & Value Ranges
-Checks that the actual data values make sense for the domain of soccer.
+## 3. Data Quality & Geometric Integrity
+Checks that the actual data values and derived calculations align with soccer domain rules and physics.
 
 | File | Test Class | Description |
 | :--- | :--- | :--- |
 | `test_data_quality.py` | `TestCoordinateRanges` | Ensures locations are within the 120x80 pitch bounds (with reasonable buffers). |
 | | `TestXGValues` | Validates that Expected Goals (xG) values are strictly between 0 and 1. |
 | | `TestBooleanFlags` | Ensures flags like `counterpress` default to `false` rather than `NULL`. |
+| `test_geometry.py` | `TestGeometricConsistency` | Trigonometrically verifies `pass_length` and `pass_angle` from raw X/Y coordinates. |
+| | | Validates that 'Goal' end locations fall within the physical coordinates of the net. |
 | `test_advanced_events.py` | `TestSubstitutionEvents` | Verifies replacement IDs and outcomes (Tactical, Injury) are correctly captured. |
-| | `TestGoalkeepingEvents` | Checks for existence of goalkeeper-specific event metadata. |
 
 ## 4. Business Logic & Transformations
 Tests the "intelligence" of the ETL pipeline, such as name cleaning and coordinate extraction.
@@ -55,8 +57,8 @@ Validates the most complex parts of the dataset: lineups and 360-degree tracking
 
 | File | Test Class | Description |
 | :--- | :--- | :--- |
-| `test_lineups.py` | `TestLineupConsistency` | Checks that every match has a full starting XI and valid player/team links. |
-| | `TestLineupTemporalIntegrity` | Validates the timing of position changes (substitutions). |
+| `test_lineup_consistency.py` | `TestLineupEventConsistency` | Ensures players recording events are present in match lineups and checks Starting XI counts. |
+| `test_lineups.py` | `TestLineupIntegrity` | Verifies complete rosters and team-match links for all lineups. |
 | `test_threesixty.py` | `TestThreeSixtyReferential` | Links 360 tracking frames and player positions back to specific event UUIDs. |
 | | `TestThreeSixtyDataQuality` | Validates visibility polygons and player "actor" flags. |
 
@@ -67,7 +69,7 @@ Performs "macro" checks to ensure the dataset represents the real world of footb
 | :--- | :--- | :--- |
 | `test_statistical_sanity.py`| `TestXGCalibration` | Statistical check: high xG shots must result in goals more often than low xG shots. |
 | | `TestSpatialSanity` | Ensures "extreme" errors (like shots taken from one's own penalty area) are flagged. |
-| | `TestScoreConsistency` | Sums all "Goal" events and compares the total against the final match score. |
+| `test_detailed_validation.py` | `test_match_score_summation_strict` | Sums all "Goal" and "Own Goal" events and compares against the official match score. |
 
 ---
 **Run all tests using:**
