@@ -33,7 +33,7 @@ graph TD
 
     subgraph "ETL Pipeline ⚙️"
         BUILD[build.py]
-        SCHEMA[schema.py]
+        SCHEMA[schema/ package]
     end
 
     subgraph "Storage 💾"
@@ -146,7 +146,8 @@ WHERE e.type = 'Shot' AND e.match_id = 3788741;
 
 For deep dives into the engineering and data structure, refer to the following:
 
-- 📑 **[db_spec.md](db_spec.md)**: Detailed schema, table definitions, and indexing strategy.
+- 📑 **[db_spec.md](docs/db_spec.md)**: Detailed schema, table definitions, and indexing strategy.
+- 🧪 **[tests.md](docs/tests.md)**: Overview of the testing suite and data quality checks.
 
 ---
 
@@ -161,7 +162,7 @@ pytest -v
 
 The tests cover:
 - **Schema Validation**: Correctness of tables and types.
-- **Referential Integrity**: PK/FK consistency across all 8 tables.
+- **Referential Integrity**: PK/FK consistency across all 15 tables.
 - **Data Quality**: Coordinate bounds, xG ranges, and event sequences.
 
 ## 🙏 Acknowledgments
