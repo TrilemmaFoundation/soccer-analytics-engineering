@@ -111,123 +111,86 @@ class TestPassRecipientConsistency:
 
 
 class TestJSONFieldTransformations:
-    """Test that JSON fields are correctly transformed from source data."""
+    """Test that coordinate fields are correctly extracted from source data."""
 
-    def test_location_json_format(self, cursor):
-        """Test that location field contains valid JSON array [x, y]."""
+    def test_location_coordinates(self, cursor):
+        """Test that location_x and location_y are within reasonable ranges."""
         cursor.execute("""
-            SELECT location, location_x, location_y
+            SELECT location_x, location_y
             FROM events
-            WHERE location IS NOT NULL
+            WHERE location_x IS NOT NULL AND location_y IS NOT NULL
             LIMIT 100;
         """)
         results = cursor.fetchall()
         
-        for location_json, location_x, location_y in results:
-            if location_json:
-                try:
-                    location_array = json.loads(location_json)
-                    assert isinstance(location_array, list), (
-                        f"Location should be JSON array, got: {location_json}"
-                    )
-                    assert len(location_array) >= 2, (
-                        f"Location array should have at least 2 elements, got: {location_array}"
-                    )
-                    # Check that extracted coordinates match JSON
-                    if location_x is not None and location_y is not None:
-                        assert abs(location_array[0] - location_x) < 0.001, (
-                            f"location_x mismatch: JSON={location_array[0]}, column={location_x}"
-                        )
-                        assert abs(location_array[1] - location_y) < 0.001, (
-                            f"location_y mismatch: JSON={location_array[1]}, column={location_y}"
-                        )
-                except json.JSONDecodeError:
-                    pytest.fail(f"Invalid JSON in location field: {location_json}")
+        for location_x, location_y in results:
+            assert -10 <= location_x <= 130, (
+                f"location_x out of range: {location_x}"
+            )
+            assert -10 <= location_y <= 90, (
+                f"location_y out of range: {location_y}"
+            )
 
-    def test_shot_end_location_json_format(self, cursor):
-        """Test that shot_end_location contains valid JSON array [x, y, z]."""
+    def test_shot_end_location_coordinates(self, cursor):
+        """Test that shot_end_location_x/y/z are within reasonable ranges."""
         cursor.execute("""
-            SELECT shot_end_location
+            SELECT shot_end_location_x, shot_end_location_y, shot_end_location_z
             FROM events
-            WHERE shot_end_location IS NOT NULL
+            WHERE type = 'Shot' 
+                AND (shot_end_location_x IS NOT NULL 
+                     OR shot_end_location_y IS NOT NULL 
+                     OR shot_end_location_z IS NOT NULL)
             LIMIT 100;
         """)
         results = cursor.fetchall()
         
-        for (shot_end_location,) in results:
-            if shot_end_location:
-                try:
-                    location_array = json.loads(shot_end_location)
-                    assert isinstance(location_array, list), (
-                        f"shot_end_location should be JSON array, got: {shot_end_location}"
-                    )
-                    assert len(location_array) >= 2, (
-                        f"shot_end_location array should have at least 2 elements, got: {location_array}"
-                    )
-                except json.JSONDecodeError:
-                    pytest.fail(f"Invalid JSON in shot_end_location field: {shot_end_location}")
+        for x, y, z in results:
+            if x is not None:
+                assert -10 <= x <= 130, f"shot_end_location_x out of range: {x}"
+            if y is not None:
+                assert -10 <= y <= 90, f"shot_end_location_y out of range: {y}"
+            if z is not None:
+                assert 0 <= z <= 10, f"shot_end_location_z out of range: {z}"
 
-    def test_pass_end_location_json_format(self, cursor):
-        """Test that pass_end_location contains valid JSON array [x, y]."""
+    def test_pass_end_location_coordinates(self, cursor):
+        """Test that pass_end_location_x/y are within reasonable ranges."""
         cursor.execute("""
-            SELECT pass_end_location, pass_end_location_x, pass_end_location_y
+            SELECT pass_end_location_x, pass_end_location_y
             FROM events
-            WHERE pass_end_location IS NOT NULL
+            WHERE type = 'Pass' 
+                AND pass_end_location_x IS NOT NULL 
+                AND pass_end_location_y IS NOT NULL
             LIMIT 100;
         """)
         results = cursor.fetchall()
         
-        for pass_end_location, pass_end_location_x, pass_end_location_y in results:
-            if pass_end_location:
-                try:
-                    location_array = json.loads(pass_end_location)
-                    assert isinstance(location_array, list), (
-                        f"pass_end_location should be JSON array, got: {pass_end_location}"
-                    )
-                    assert len(location_array) >= 2, (
-                        f"pass_end_location array should have at least 2 elements, got: {location_array}"
-                    )
-                    # Check that extracted coordinates match JSON
-                    if pass_end_location_x is not None and pass_end_location_y is not None:
-                        assert abs(location_array[0] - pass_end_location_x) < 0.001, (
-                            f"pass_end_location_x mismatch: JSON={location_array[0]}, column={pass_end_location_x}"
-                        )
-                        assert abs(location_array[1] - pass_end_location_y) < 0.001, (
-                            f"pass_end_location_y mismatch: JSON={location_array[1]}, column={pass_end_location_y}"
-                        )
-                except json.JSONDecodeError:
-                    pytest.fail(f"Invalid JSON in pass_end_location field: {pass_end_location}")
+        for x, y in results:
+            assert -10 <= x <= 130, (
+                f"pass_end_location_x out of range: {x}"
+            )
+            assert -10 <= y <= 90, (
+                f"pass_end_location_y out of range: {y}"
+            )
 
-    def test_carry_end_location_json_format(self, cursor):
-        """Test that carry_end_location contains valid JSON array [x, y]."""
+    def test_carry_end_location_coordinates(self, cursor):
+        """Test that carry_end_location_x/y are within reasonable ranges."""
         cursor.execute("""
-            SELECT carry_end_location, carry_end_location_x, carry_end_location_y
+            SELECT carry_end_location_x, carry_end_location_y
             FROM events
-            WHERE carry_end_location IS NOT NULL
+            WHERE type = 'Carry' 
+                AND carry_end_location_x IS NOT NULL 
+                AND carry_end_location_y IS NOT NULL
             LIMIT 100;
         """)
         results = cursor.fetchall()
         
-        for carry_end_location, carry_end_location_x, carry_end_location_y in results:
-            if carry_end_location:
-                try:
-                    location_array = json.loads(carry_end_location)
-                    assert isinstance(location_array, list), (
-                        f"carry_end_location should be JSON array, got: {carry_end_location}"
-                    )
-                    assert len(location_array) >= 2, (
-                        f"carry_end_location array should have at least 2 elements, got: {location_array}"
-                    )
-                    # Check that extracted coordinates match JSON
-                    if carry_end_location_x is not None and carry_end_location_y is not None:
-                        assert abs(location_array[0] - carry_end_location_x) < 0.001, (
-                            f"carry_end_location_x mismatch: JSON={location_array[0]}, column={carry_end_location_x}"
-                        )
-                        assert abs(location_array[1] - carry_end_location_y) < 0.001, (
-                            f"carry_end_location_y mismatch: JSON={location_array[1]}, column={carry_end_location_y}"
-                        )
-                except json.JSONDecodeError:
-                    pytest.fail(f"Invalid JSON in carry_end_location field: {carry_end_location}")
+        for x, y in results:
+            assert -10 <= x <= 130, (
+                f"carry_end_location_x out of range: {x}"
+            )
+            assert -10 <= y <= 90, (
+                f"carry_end_location_y out of range: {y}"
+            )
 
     def test_shot_freeze_frame_json_format(self, cursor):
         """Test that shot_freeze_frame contains valid JSON array."""

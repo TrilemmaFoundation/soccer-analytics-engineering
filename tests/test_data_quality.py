@@ -299,11 +299,7 @@ class TestJSONFields:
     """Test that JSON fields contain valid JSON or are NULL."""
 
     JSON_FIELDS = [
-        "location",
-        "shot_end_location",
         "shot_freeze_frame",
-        "pass_end_location",
-        "carry_end_location",
     ]
 
     @pytest.mark.parametrize("field_name", JSON_FIELDS)

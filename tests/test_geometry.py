@@ -51,28 +51,28 @@ class TestGeometricConsistency:
         # StatsBomb recorded goals are [120, y, z] for shots that end in the net.
         cursor.execute("""
             SELECT 
-                shot_end_location,
+                shot_end_location_x,
+                shot_end_location_y,
+                shot_end_location_z,
                 shot_outcome
             FROM events
             WHERE type = 'Shot' 
                 AND shot_outcome = 'Goal'
-                AND shot_end_location IS NOT NULL
+                AND shot_end_location_x IS NOT NULL
+                AND shot_end_location_y IS NOT NULL
             LIMIT 100;
         """)
         rows = cursor.fetchall()
         
-        import json
-        for end_loc_json, outcome in rows:
-            loc = json.loads(end_loc_json)
+        for x, y, z, outcome in rows:
             # Goals should typically end at x=120 (or slightly beyond)
             # and within the y-range of 36-44
-            x, y = loc[0], loc[1]
-            z = loc[2] if len(loc) > 2 else 0
+            z_val = z if z is not None else 0
             
             # Allow some margin (e.g. shot hits back of net)
             assert x >= 118, f"Goal recorded at x={x}, expected ~120"
             assert 35 <= y <= 45, f"Goal recorded at y={y}, expected 36-44"
-            assert 0 <= z <= 3, f"Goal recorded at z={z}, expected 0-2.67"
+            assert 0 <= z_val <= 3, f"Goal recorded at z={z_val}, expected 0-2.67"
 
     def test_carry_distance_consistency(self, cursor):
         """Verify that carry distances are non-zero if end location differs."""

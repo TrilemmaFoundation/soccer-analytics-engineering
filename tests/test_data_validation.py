@@ -428,8 +428,7 @@ class TestEventDataConsistency:
             FROM events 
             WHERE type = 'Pass'
                 AND pass_outcome IS NULL
-                AND (pass_end_location IS NULL 
-                    OR pass_end_location_x IS NULL 
+                AND (pass_end_location_x IS NULL 
                     OR pass_end_location_y IS NULL);
         """)
         incomplete_passes = cursor.fetchone()[0]
@@ -505,8 +504,7 @@ class TestEventDataConsistency:
             SELECT COUNT(*) 
             FROM events 
             WHERE type = 'Carry'
-                AND (carry_end_location IS NULL 
-                    OR carry_end_location_x IS NULL 
+                AND (carry_end_location_x IS NULL 
                     OR carry_end_location_y IS NULL);
         """)
         carries_without_end_location = cursor.fetchone()[0]
