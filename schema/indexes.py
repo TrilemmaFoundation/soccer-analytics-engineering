@@ -1,12 +1,20 @@
 def create_indexes(c):
     """Create indexes for improved query performance."""
     indexes = [
-        # Core event indexes
+        # Core event indexes (single-column)
         "CREATE INDEX IF NOT EXISTS idx_events_match ON events(match_id);",
         "CREATE INDEX IF NOT EXISTS idx_events_player ON events(player_id);",
         "CREATE INDEX IF NOT EXISTS idx_events_type ON events(type_id);",
         "CREATE INDEX IF NOT EXISTS idx_events_team ON events(team_id);",
         "CREATE INDEX IF NOT EXISTS idx_events_possession ON events(possession_team_id);",
+        
+        # Composite indexes for common query patterns
+        "CREATE INDEX IF NOT EXISTS idx_events_match_type ON events(match_id, type_id);",
+        "CREATE INDEX IF NOT EXISTS idx_events_match_player ON events(match_id, player_id);",
+        "CREATE INDEX IF NOT EXISTS idx_events_player_type ON events(player_id, type_id);",
+        
+        # Index for shot outcome queries (covers filtering by type + outcome)
+        "CREATE INDEX IF NOT EXISTS idx_events_type_shot_outcome ON events(type_id, shot_outcome);",
         
         # Match indexes
         "CREATE INDEX IF NOT EXISTS idx_matches_competition ON matches(competition_id, season_id);",

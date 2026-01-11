@@ -1,3 +1,27 @@
+def _create_enum_types(c):
+    """Create ENUM types for low-cardinality categorical columns.
+    
+    These improve storage efficiency and query performance for columns with
+    a small number of distinct values.
+    """
+    # Shot outcome ENUM (8 distinct values)
+    c.execute("""
+        DROP TYPE IF EXISTS shot_outcome_enum;
+        CREATE TYPE shot_outcome_enum AS ENUM (
+            'Blocked', 'Goal', 'Off T', 'Post', 'Saved', 
+            'Saved Off Target', 'Saved to Post', 'Wayward'
+        );
+    """)
+    
+    # Pass outcome ENUM (5 distinct values)
+    c.execute("""
+        DROP TYPE IF EXISTS pass_outcome_enum;
+        CREATE TYPE pass_outcome_enum AS ENUM (
+            'Incomplete', 'Injury Clearance', 'Out', 'Pass Offside', 'Unknown'
+        );
+    """)
+
+
 def make_competitions(c):
     c.execute(
         """
@@ -162,8 +186,7 @@ def make_events(c):
                 timestamp               TEXT,
                 duration                REAL,
 
-                -- Location
-                location                TEXT,
+                -- Location (extracted coordinates only - JSON removed for efficiency)
                 location_x              REAL,
                 location_y              REAL,
 
@@ -191,13 +214,12 @@ def make_events(c):
                 play_pattern_id         INTEGER,
                 play_pattern            TEXT,
 
-            -- Shot Attributes
-                shot_end_location       TEXT,
+            -- Shot Attributes (extracted coordinates only - JSON removed for efficiency)
                 shot_end_location_x     REAL,
                 shot_end_location_y     REAL,
                 shot_end_location_z     REAL,
                 shot_statsbomb_xg       REAL,
-                shot_outcome            TEXT,
+                shot_outcome            shot_outcome_enum,
                 shot_technique          TEXT,
                 shot_body_part          TEXT,
                 shot_type               TEXT,
@@ -215,8 +237,7 @@ def make_events(c):
                 shot_saved_off_target   BOOL,
                 shot_saved_to_post      BOOL,
 
-            -- Pass Attributes
-                pass_end_location       TEXT,
+            -- Pass Attributes (extracted coordinates only - JSON removed for efficiency)
                 pass_end_location_x     REAL,
                 pass_end_location_y     REAL,
                 pass_recipient_id       INTEGER,
@@ -226,7 +247,7 @@ def make_events(c):
                 pass_height             TEXT,
                 pass_body_part          TEXT,
                 pass_type               TEXT,
-                pass_outcome            TEXT,
+                pass_outcome            pass_outcome_enum,
                 pass_technique          TEXT,
                 pass_assisted_shot_id   TEXT,
 
@@ -245,8 +266,7 @@ def make_events(c):
                 pass_straight           BOOL,
                 pass_miscommunication   BOOL,
 
-            -- Carry Attributes
-                carry_end_location      TEXT,
+            -- Carry Attributes (extracted coordinates only - JSON removed for efficiency)
                 carry_end_location_x    REAL,
                 carry_end_location_y    REAL,
 
@@ -278,7 +298,7 @@ def make_events(c):
                 goalkeeper_technique        TEXT,
                 goalkeeper_position         TEXT,
                 goalkeeper_body_part        TEXT,
-                goalkeeper_end_location     TEXT,
+                -- goalkeeper_end_location JSON removed - use extracted coordinates
                 goalkeeper_end_location_x   REAL,
                 goalkeeper_end_location_y   REAL,
 

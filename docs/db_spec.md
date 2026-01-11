@@ -171,12 +171,11 @@ Common event types include: Pass, Shot, Carry, Dribble, Pressure, Ball Recovery,
 
 | Column                  | Type        | Description                              |
 | ----------------------- | ----------- | ---------------------------------------- |
-| `shot_end_location`     | TEXT (JSON) | Shot target [x, y, z]                    |
 | `shot_end_location_x`   | REAL        | Shot end X coordinate                    |
 | `shot_end_location_y`   | REAL        | Shot end Y coordinate                    |
 | `shot_end_location_z`   | REAL        | Shot end Z coordinate                    |
 | `shot_statsbomb_xg`     | REAL        | Expected goals value (0.0-1.0)           |
-| `shot_outcome`          | TEXT        | Shot result (Goal, Saved, Blocked, etc.) |
+| `shot_outcome`          | ENUM        | Shot result (Goal, Saved, Blocked, etc.) - see `shot_outcome_enum` |
 | `shot_technique`        | TEXT        | Shot technique (Normal, Volley, etc.)    |
 | `shot_body_part`        | TEXT        | Body part used                           |
 | `shot_type`             | TEXT        | Shot type (Open Play, Penalty, etc.)     |
@@ -196,7 +195,6 @@ Common event types include: Pass, Shot, Carry, Dribble, Pressure, Ball Recovery,
 
 | Column                  | Type        | Description                                        |
 | ----------------------- | ----------- | -------------------------------------------------- |
-| `pass_end_location`     | TEXT (JSON) | Pass destination [x, y]                            |
 | `pass_end_location_x`   | REAL        | Pass end X coordinate                              |
 | `pass_end_location_y`   | REAL        | Pass end Y coordinate                              |
 | `pass_recipient_id`     | INTEGER     | Receiving player ID                                |
@@ -206,7 +204,7 @@ Common event types include: Pass, Shot, Carry, Dribble, Pressure, Ball Recovery,
 | `pass_height`           | TEXT        | Pass height (Ground Pass, High Pass, Low Pass)     |
 | `pass_body_part`        | TEXT        | Body part used (Left Foot, Right Foot, Head, etc.) |
 | `pass_type`             | TEXT        | Pass type (Corner, Throw-in, Free Kick, etc.)      |
-| `pass_outcome`          | TEXT        | Pass result (Incomplete, Out, etc.)                |
+| `pass_outcome`          | ENUM        | Pass result (Incomplete, Out, etc.) - see `pass_outcome_enum` |
 | `pass_technique`        | TEXT        | Pass technique (Inswinging, Outswinging, etc.)     |
 | `pass_assisted_shot_id` | TEXT        | Linked shot ID if assist                           |
 | `pass_goal_assist`      | BOOLEAN     | Goal assist flag                                   |
@@ -227,7 +225,6 @@ Common event types include: Pass, Shot, Carry, Dribble, Pressure, Ball Recovery,
 
 | Column                  | Type        | Description                 |
 | ----------------------- | ----------- | --------------------------- |
-| `carry_end_location`     | TEXT (JSON) | Carry destination [x, y]    |
 | `carry_end_location_x`  | REAL        | Carry end X coordinate      |
 | `carry_end_location_y`  | REAL        | Carry end Y coordinate      |
 
@@ -265,7 +262,6 @@ Common event types include: Pass, Shot, Carry, Dribble, Pressure, Ball Recovery,
 | `goalkeeper_body_part` | TEXT | Body part used |
 | `goalkeeper_technique` | TEXT | Technique (Diving, Standing, etc.) |
 | `goalkeeper_position` | TEXT | GK position (Set, Moving, etc.) |
-| `goalkeeper_end_location` | TEXT (JSON) | Action end location [x, y] |
 | `goalkeeper_end_location_x` | REAL | Action end X coordinate |
 | `goalkeeper_end_location_y` | REAL | Action end Y coordinate |
 
@@ -382,23 +378,36 @@ Common event types include: Pass, Shot, Carry, Dribble, Pressure, Ball Recovery,
 - **Field Dimensions**: 120 yards (width) × 80 yards (height)
 - **Origin**: Bottom-left corner (0, 0)
 - **Goals**: Located at x=0 (left goal) and x=120 (right goal)
-- **Format**: JSON arrays `[x, y]` for 2D, `[x, y, z]` for 3D (shots)
-- **Extracted Coordinates**: `location_x`, `location_y` columns provide direct numeric access
+- **Storage Format**: Coordinates are stored as separate REAL columns (`location_x`, `location_y`, etc.) for optimal query performance
+- **Coordinate Columns**: Use `location_x`, `location_y` for event locations; `shot_end_location_x/y/z` for shot targets; similar patterns for passes, carries, and goalkeeper actions
 
-### JSON Fields
+### Location Coordinates
 
-All JSON fields are stored as TEXT and can be parsed using DuckDB's JSON functions:
+**Note**: Redundant JSON location columns have been removed for storage efficiency. Use the extracted coordinate columns directly:
 
-```sql
--- Extract x coordinate
-json_extract(location, '$[0]')
+- `location_x`, `location_y` - Event location coordinates
+- `shot_end_location_x`, `shot_end_location_y`, `shot_end_location_z` - Shot end coordinates
+- `pass_end_location_x`, `pass_end_location_y` - Pass end coordinates
+- `carry_end_location_x`, `carry_end_location_y` - Carry end coordinates
+- `goalkeeper_end_location_x`, `goalkeeper_end_location_y` - Goalkeeper action end coordinates
 
--- Extract y coordinate
-json_extract(location, '$[1]')
+The only JSON fields remaining are:
+- `shot_freeze_frame` - Player positions at shot moment (complex nested structure)
+- `visible_area` - Polygon coordinates for 360° tracking (in `three_sixty_frames` table)
 
--- Extract z coordinate (shots)
-json_extract(shot_end_location, '$[2]')
-```
+### ENUM Types
+
+The database uses ENUM types for low-cardinality categorical columns to improve storage efficiency and query performance:
+
+- **`shot_outcome_enum`**: 8 distinct values
+  - Values: `'Blocked'`, `'Goal'`, `'Off T'`, `'Post'`, `'Saved'`, `'Saved Off Target'`, `'Saved to Post'`, `'Wayward'`
+  - Used in: `events.shot_outcome`
+
+- **`pass_outcome_enum`**: 5 distinct values
+  - Values: `'Incomplete'`, `'Injury Clearance'`, `'Out'`, `'Pass Offside'`, `'Unknown'`
+  - Used in: `events.pass_outcome`
+
+When querying ENUM columns, use the exact string values (case-sensitive). ENUM types provide better compression and faster comparisons than TEXT columns.
 
 ### Boolean Fields
 
@@ -408,10 +417,11 @@ All boolean values are stored as BOOLEAN type:
 
 ## Indexes
 
-The database includes 17 indexes created by `schema/indexes.py` to optimize query performance:
+The database includes 21 indexes created by `schema/indexes.py` to optimize query performance:
 
 ### Events Table Indexes
 
+#### Single-Column Indexes
 | Index Name | Columns | Purpose |
 |------------|---------|---------|
 | `idx_events_match` | `match_id` | Fast filtering by match |
@@ -419,6 +429,14 @@ The database includes 17 indexes created by `schema/indexes.py` to optimize quer
 | `idx_events_type` | `type_id` | Fast filtering by event type |
 | `idx_events_team` | `team_id` | Fast team-based queries |
 | `idx_events_possession` | `possession_team_id` | Rapid possession sequence retrieval |
+
+#### Composite Indexes (Optimized for Common Query Patterns)
+| Index Name | Columns | Purpose |
+|------------|---------|---------|
+| `idx_events_match_type` | `match_id`, `type_id` | Fast filtering by match and event type |
+| `idx_events_match_player` | `match_id`, `player_id` | Fast player actions per match queries |
+| `idx_events_player_type` | `player_id`, `type_id` | Fast player-specific event type queries |
+| `idx_events_type_shot_outcome` | `type_id`, `shot_outcome` | Optimized shot outcome analysis |
 
 ### Matches Table Indexes
 
@@ -560,13 +578,23 @@ GROUP BY x, y
 ORDER BY event_count DESC;
 ```
 
-## Performance Considerations
+## Performance Optimizations
+
+### ETL Performance
+
+The database build process has been optimized with a **single-pass ETL** approach:
+
+- **Staging Table Pattern**: Events JSON files are loaded once into a staging table, then reference tables (event_types, positions, players, play_patterns) are extracted from the staging table
+- **Result**: 3-4x faster build times compared to multiple JSON scans
+- **Schema Handling**: Uses `union_by_name=true` to handle varying JSON schemas across different event types
 
 ### Query Optimization
 
-- **Use indexes**: The database includes 7 indexes on frequently queried columns (see [Indexes](#indexes) section above). Filter on indexed columns (`match_id`, `type_id`, `player_id`, `team_id`) when possible
+- **Use indexes**: The database includes 21 indexes including composite indexes for common query patterns (see [Indexes](#indexes) section above). Filter on indexed columns (`match_id`, `type_id`, `player_id`, `team_id`) when possible
+- **Composite indexes**: Take advantage of composite indexes like `(match_id, type_id)` for queries filtering on multiple columns
 - **Filter early**: Apply WHERE clauses before JOINs and aggregations
-- **Coordinate efficiency**: Use extracted coordinate columns (`location_x`, `location_y`) instead of JSON extraction when available
+- **Coordinate efficiency**: Use extracted coordinate columns (`location_x`, `location_y`) directly - JSON location columns have been removed for better performance
+- **ENUM types**: Categorical columns (`shot_outcome`, `pass_outcome`) use ENUM types for better storage efficiency
 - **Consider query result caching**: For complex analytics that are run repeatedly
 
 ### Memory Usage
@@ -601,12 +629,13 @@ WHERE shot_statsbomb_xg IS NOT NULL;
 
 ### Best Practices
 
-1. **Always use indexes**: Filter on indexed columns (match_id, type, player_id) when possible
-2. **Coordinate efficiency**: Use `location_x` and `location_y` columns instead of JSON extraction when available
-3. **Coordinate validation**: Check coordinate bounds (0-120, 0-80) for spatial analysis
-4. **Time analysis**: Combine minute and second for precise timing
-5. **Memory management**: Use LIMIT clauses for large queries
-6. **Data validation**: Always check for NULL values in optional fields
+1. **Always use indexes**: Filter on indexed columns (match_id, type_id, player_id) when possible. Use composite indexes for multi-column filters
+2. **Coordinate efficiency**: Use `location_x` and `location_y` columns directly - JSON location columns have been removed
+3. **ENUM types**: When filtering by `shot_outcome` or `pass_outcome`, use the exact ENUM values (case-sensitive)
+4. **Coordinate validation**: Check coordinate bounds (0-120, 0-80) for spatial analysis
+5. **Time analysis**: Combine minute and second for precise timing
+6. **Memory management**: Use LIMIT clauses for large queries
+7. **Data validation**: Always check for NULL values in optional fields
 
 ### Common Pitfalls
 
@@ -625,12 +654,20 @@ WHERE shot_statsbomb_xg IS NOT NULL;
 
 ## Building the Database
 
-The database is built using `build.py`, which:
+The database is built using `build.py`, which follows an optimized build process:
 
-1. Reads competition metadata from `./open-data/data/competitions.json`
-2. Processes match files from `./open-data/data/matches/`
-3. Processes event files from `./open-data/data/events/`
-4. Creates normalized tables with foreign key relationships
-5. Outputs `stats.duckdb` in the root directory
+1. **Creates ENUM types** for categorical columns (`shot_outcome_enum`, `pass_outcome_enum`)
+2. **Creates all tables** with normalized schemas and foreign key relationships
+3. **Loads core data**: competitions, teams, matches
+4. **Optimized single-pass ETL**: 
+   - Loads events JSON files once into a staging table
+   - Extracts reference tables (event_types, positions, players, play_patterns) from staging
+   - Transforms and inserts events from staging table
+   - This approach reduces JSON file scans from 5+ to 1, resulting in 3-4x faster builds
+5. **Loads lineup data** and 360° tracking data
+6. **Creates indexes**: 21 indexes including composite indexes for common query patterns
+7. Outputs `stats.duckdb` in the root directory
+
+**Build Performance**: Typical build time is ~2.5 minutes for ~12M events and ~15M 360 positions.
 
 See the main [README.md](README.md) for setup and build instructions.

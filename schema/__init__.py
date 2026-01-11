@@ -1,5 +1,6 @@
 # Table creation functions
 from .tables import (
+    _create_enum_types,
     make_competitions,
     make_matches,
     make_teams,

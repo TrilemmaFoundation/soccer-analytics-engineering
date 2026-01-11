@@ -1,6 +1,6 @@
-import os
-import json
 import glob
+import json
+
 from .utils import _get_player_name_case
 
 
@@ -9,7 +9,7 @@ def _get_valid_json_files(pattern):
     valid_files = []
     for f in glob.glob(pattern, recursive=True):
         try:
-            with open(f, 'r') as file:
+            with open(f, "r") as file:
                 json.load(file)
             valid_files.append(f)
         except:
@@ -104,53 +104,178 @@ def load_matches(c):
     return c.execute("SELECT COUNT(*) FROM matches").fetchone()[0]
 
 
-def load_event_types(c):
-    """Load event type reference data."""
+def _load_reference_tables_from_staging(c, case_stmt):
+    """Load all reference tables from staging_events table in a single pass.
+
+    This function extracts event_types, positions, play_patterns, and players
+    from the staging table, avoiding multiple scans of the JSON files.
+    """
+    # Load event types
     c.execute("""
         INSERT INTO event_types
         SELECT DISTINCT 
             type.id,
             type.name
-        FROM read_json_auto('./open-data/data/events/*.json', format='array')
+        FROM staging_events
         WHERE type.id IS NOT NULL;
     """)
 
-
-def load_positions(c):
-    """Load position reference data."""
+    # Load positions
     c.execute("""
         INSERT INTO positions
         SELECT DISTINCT 
             position.id,
             position.name
-        FROM read_json_auto('./open-data/data/events/*.json', format='array')
+        FROM staging_events
         WHERE position.id IS NOT NULL;
     """)
 
-
-def load_play_patterns(c):
-    """Load play pattern reference data."""
+    # Load play patterns
     c.execute("""
         INSERT INTO play_patterns
         SELECT DISTINCT 
             play_pattern.id,
             play_pattern.name
-        FROM read_json_auto('./open-data/data/events/*.json', format='array')
+        FROM staging_events
         WHERE play_pattern.id IS NOT NULL;
     """)
 
-
-def load_players(c):
-    """Load player reference data with canonicalized names."""
-    case_stmt = _get_player_name_case()
+    # Load players with canonicalized names
     c.execute(f"""
         INSERT INTO players
         SELECT DISTINCT 
             player.id,
             {case_stmt} as name
-        FROM read_json_auto('./open-data/data/events/*.json', format='array')
+        FROM staging_events
         WHERE player.id IS NOT NULL;
     """)
+
+
+def load_event_types(c):
+    """Load event type reference data.
+
+    Note: This function is kept for backward compatibility but is now
+    optimized to use staging_events table when available.
+    """
+    # Check if staging table exists (from optimized load path)
+    result = c.execute("""
+        SELECT COUNT(*) FROM information_schema.tables 
+        WHERE table_name = 'staging_events'
+    """).fetchone()[0]
+
+    if result > 0:
+        c.execute("""
+            INSERT INTO event_types
+            SELECT DISTINCT 
+                type.id,
+                type.name
+            FROM staging_events
+            WHERE type.id IS NOT NULL;
+        """)
+    else:
+        # Fallback to direct JSON scan (for backward compatibility)
+        c.execute("""
+            INSERT INTO event_types
+            SELECT DISTINCT 
+                type.id,
+                type.name
+            FROM read_json_auto('./open-data/data/events/*.json', format='array', union_by_name=true)
+            WHERE type.id IS NOT NULL;
+        """)
+
+
+def load_positions(c):
+    """Load position reference data.
+
+    Note: This function is kept for backward compatibility but is now
+    optimized to use staging_events table when available.
+    """
+    result = c.execute("""
+        SELECT COUNT(*) FROM information_schema.tables 
+        WHERE table_name = 'staging_events'
+    """).fetchone()[0]
+
+    if result > 0:
+        c.execute("""
+            INSERT INTO positions
+            SELECT DISTINCT 
+                position.id,
+                position.name
+            FROM staging_events
+            WHERE position.id IS NOT NULL;
+        """)
+    else:
+        c.execute("""
+            INSERT INTO positions
+            SELECT DISTINCT 
+                position.id,
+                position.name
+            FROM read_json_auto('./open-data/data/events/*.json', format='array', union_by_name=true)
+            WHERE position.id IS NOT NULL;
+        """)
+
+
+def load_play_patterns(c):
+    """Load play pattern reference data.
+
+    Note: This function is kept for backward compatibility but is now
+    optimized to use staging_events table when available.
+    """
+    result = c.execute("""
+        SELECT COUNT(*) FROM information_schema.tables 
+        WHERE table_name = 'staging_events'
+    """).fetchone()[0]
+
+    if result > 0:
+        c.execute("""
+            INSERT INTO play_patterns
+            SELECT DISTINCT 
+                play_pattern.id,
+                play_pattern.name
+            FROM staging_events
+            WHERE play_pattern.id IS NOT NULL;
+        """)
+    else:
+        c.execute("""
+            INSERT INTO play_patterns
+            SELECT DISTINCT 
+                play_pattern.id,
+                play_pattern.name
+            FROM read_json_auto('./open-data/data/events/*.json', format='array', union_by_name=true)
+            WHERE play_pattern.id IS NOT NULL;
+        """)
+
+
+def load_players(c):
+    """Load player reference data with canonicalized names.
+
+    Note: This function is kept for backward compatibility but is now
+    optimized to use staging_events table when available.
+    """
+    case_stmt = _get_player_name_case()
+    result = c.execute("""
+        SELECT COUNT(*) FROM information_schema.tables 
+        WHERE table_name = 'staging_events'
+    """).fetchone()[0]
+
+    if result > 0:
+        c.execute(f"""
+            INSERT INTO players
+            SELECT DISTINCT 
+                player.id,
+                {case_stmt} as name
+            FROM staging_events
+            WHERE player.id IS NOT NULL;
+        """)
+    else:
+        c.execute(f"""
+            INSERT INTO players
+            SELECT DISTINCT 
+                player.id,
+                {case_stmt} as name
+            FROM read_json_auto('./open-data/data/events/*.json', format='array', union_by_name=true)
+            WHERE player.id IS NOT NULL;
+        """)
 
 
 def load_countries(c):
@@ -170,8 +295,25 @@ def load_countries(c):
 
 
 def load_events(c):
-    """Load events with comprehensive field extraction for all event types."""
+    """Load events with comprehensive field extraction for all event types.
+
+    Optimized to use a staging table approach: loads JSON once into staging_events,
+    then extracts reference tables and transforms events from the staging table.
+    This avoids multiple scans of the JSON files.
+    """
     case_stmt = _get_player_name_case()
+
+    # Create staging table - single scan of JSON files
+    # Use union_by_name=true to handle JSON files with varying schemas (different event types have different fields)
+    c.execute("""
+        CREATE TEMP TABLE staging_events AS 
+        SELECT * FROM read_json_auto('./open-data/data/events/*.json', format='array', filename=true, union_by_name=true);
+    """)
+
+    # Extract reference tables from staging (no additional I/O)
+    _load_reference_tables_from_staging(c, case_stmt)
+
+    # Transform and insert events from staging table
     c.execute(f"""
         INSERT INTO events
         SELECT 
@@ -182,11 +324,7 @@ def load_events(c):
             second,
             timestamp,
             duration,
-            -- Location
-            CASE 
-                WHEN location IS NOT NULL THEN json(location)
-                ELSE NULL
-            END as location,
+            -- Location (extracted coordinates only - JSON removed for efficiency)
             location[1]::DOUBLE as location_x,
             location[2]::DOUBLE as location_y,
             -- Possession
@@ -211,16 +349,12 @@ def load_events(c):
             play_pattern.id as play_pattern_id,
             play_pattern.name as play_pattern,
             
-            -- Shot fields
-            CASE 
-                WHEN shot.end_location IS NOT NULL THEN json(shot.end_location)
-                ELSE NULL
-            END as shot_end_location,
+            -- Shot fields (extracted coordinates only - JSON removed for efficiency)
             shot.end_location[1]::DOUBLE as shot_end_location_x,
             shot.end_location[2]::DOUBLE as shot_end_location_y,
             shot.end_location[3]::DOUBLE as shot_end_location_z,
             shot.statsbomb_xg as shot_statsbomb_xg,
-            shot.outcome.name as shot_outcome,
+            shot.outcome.name::shot_outcome_enum as shot_outcome,
             shot.technique.name as shot_technique,
             shot.body_part.name as shot_body_part,
             shot.type.name as shot_type,
@@ -240,11 +374,7 @@ def load_events(c):
             CASE WHEN shot IS NOT NULL THEN COALESCE(json_extract(json(shot), '$.saved_off_target')::BOOLEAN, false) ELSE false END as shot_saved_off_target,
             CASE WHEN shot IS NOT NULL THEN COALESCE(json_extract(json(shot), '$.saved_to_post')::BOOLEAN, false) ELSE false END as shot_saved_to_post,
             
-            -- Pass fields
-            CASE 
-                WHEN pass.end_location IS NOT NULL THEN json(pass.end_location)
-                ELSE NULL
-            END as pass_end_location,
+            -- Pass fields (extracted coordinates only - JSON removed for efficiency)
             pass.end_location[1]::DOUBLE as pass_end_location_x,
             pass.end_location[2]::DOUBLE as pass_end_location_y,
             pass.recipient.id as pass_recipient_id,
@@ -254,7 +384,7 @@ def load_events(c):
             pass.height.name as pass_height,
             pass.body_part.name as pass_body_part,
             pass.type.name as pass_type,
-            pass.outcome.name as pass_outcome,
+            pass.outcome.name::pass_outcome_enum as pass_outcome,
             pass.technique.name as pass_technique,
             pass.assisted_shot_id as pass_assisted_shot_id,
             -- Pass flags
@@ -272,11 +402,7 @@ def load_events(c):
             CASE WHEN pass IS NOT NULL THEN COALESCE(json_extract(json(pass), '$.straight')::BOOLEAN, false) ELSE false END as pass_straight,
             CASE WHEN pass IS NOT NULL THEN COALESCE(json_extract(json(pass), '$.miscommunication')::BOOLEAN, false) ELSE false END as pass_miscommunication,
             
-            -- Carry fields
-            CASE 
-                WHEN carry.end_location IS NOT NULL THEN json(carry.end_location)
-                ELSE NULL
-            END as carry_end_location,
+            -- Carry fields (extracted coordinates only - JSON removed for efficiency)
             carry.end_location[1]::DOUBLE as carry_end_location_x,
             carry.end_location[2]::DOUBLE as carry_end_location_y,
             
@@ -308,10 +434,7 @@ def load_events(c):
             goalkeeper.technique.name as goalkeeper_technique,
             goalkeeper.position.name as goalkeeper_position,
             goalkeeper.body_part.name as goalkeeper_body_part,
-            CASE 
-                WHEN goalkeeper.end_location IS NOT NULL THEN json(goalkeeper.end_location)
-                ELSE NULL
-            END as goalkeeper_end_location,
+            -- goalkeeper_end_location JSON removed - use extracted coordinates
             goalkeeper.end_location[1]::DOUBLE as goalkeeper_end_location_x,
             goalkeeper.end_location[2]::DOUBLE as goalkeeper_end_location_y,
             
@@ -351,14 +474,19 @@ def load_events(c):
             -- Injury Stoppage fields
             CASE WHEN injury_stoppage IS NOT NULL THEN COALESCE(json_extract(json(injury_stoppage), '$.in_chain')::BOOLEAN, false) ELSE false END as injury_stoppage_in_chain
             
-        FROM read_json_auto('./open-data/data/events/*.json', format='array', filename=true);
+        FROM staging_events;
     """)
+
+    # Drop staging table to free memory
+    c.execute("DROP TABLE IF EXISTS staging_events;")
+
     return c.execute("SELECT COUNT(*) FROM events").fetchone()[0]
 
 
 # =============================================================================
 # Lineup Loaders
 # =============================================================================
+
 
 def load_lineups(c):
     """Load lineup team-level data."""
@@ -451,12 +579,13 @@ def load_lineup_cards(c):
 # 360 Data Loaders
 # =============================================================================
 
+
 def load_three_sixty_frames(c):
     """Load 360 frame-level metadata."""
-    valid_files = _get_valid_json_files('./open-data/data/three-sixty/*.json')
+    valid_files = _get_valid_json_files("./open-data/data/three-sixty/*.json")
     if not valid_files:
         return 0
-        
+
     c.execute(f"""
         INSERT INTO three_sixty_frames
         SELECT
@@ -473,10 +602,10 @@ def load_three_sixty_frames(c):
 
 def load_three_sixty_positions(c):
     """Load individual player positions within 360 frames."""
-    valid_files = _get_valid_json_files('./open-data/data/three-sixty/*.json')
+    valid_files = _get_valid_json_files("./open-data/data/three-sixty/*.json")
     if not valid_files:
         return 0
-        
+
     c.execute(f"""
         INSERT INTO three_sixty_positions (event_uuid, teammate, actor, keeper, location_x, location_y)
         SELECT

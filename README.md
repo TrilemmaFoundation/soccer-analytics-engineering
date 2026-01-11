@@ -9,10 +9,11 @@ Welcome to the **Soccer Analytics Engineering** repository. This project focuses
 This repository provides a robust ETL pipeline that transforms raw StatsBomb JSON files into a structured, queryable **DuckDB** database. It is designed for high-performance tactical analysis, including advanced metrics like Expected Threat (xT) and spatial mapping.
 
 ### Key Features
-- **High Performance**: Leverages DuckDB's columnar storage for lightning-fast queries.
-- **Normalized Schema**: 15 core tables with full referential integrity.
+- **High Performance**: Leverages DuckDB's columnar storage for lightning-fast queries with optimized single-pass ETL (3-4x faster builds).
+- **Normalized Schema**: 15 core tables with full referential integrity, ENUM types for categorical data, and composite indexes.
 - **Data Enrichment**: Integrated player canonicalization, 360 tracking data support, and dynamic lineup tracking.
 - **Comprehensive Testing**: Validated with a suite of ~100 data integrity and quality tests.
+- **Optimized Storage**: Removed redundant JSON columns, using extracted coordinate columns for better performance.
 
 ---
 

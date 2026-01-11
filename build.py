@@ -40,6 +40,9 @@ def setup_tables(c):
     # =========================================================================
     logger.info("Creating database tables")
     
+    # Create ENUM types first (before tables that use them)
+    schema._create_enum_types(c)
+    
     # Core tables
     schema.make_competitions(c)
     schema.make_teams(c)
@@ -86,35 +89,30 @@ def setup_tables(c):
     logger.info(f"Loaded {match_count} matches in {time.time() - matches_start:.2f}s")
 
     # =========================================================================
-    # Phase 3: Load reference tables
+    # Phase 3: Load reference tables and events (optimized single-pass)
     # =========================================================================
-    logger.info("Loading reference tables (event_types, players, positions, etc.)")
+    logger.info("Loading reference tables and events (optimized single-pass ETL)")
     ref_start = time.time()
     
-    # Event types
-    schema.load_event_types(c)
-    
-    # Positions
-    schema.load_positions(c)
-    
-    # Play patterns
-    schema.load_play_patterns(c)
-    
-    # Players (with canonicalization)
-    schema.load_players(c)
-    
-    # Countries (from lineups)
+    # Countries (from lineups - separate data source, load independently)
     countries_count = schema.load_countries(c)
+    logger.info(f"  - Loaded {countries_count} countries")
     
-    logger.info(f"Loaded reference tables ({countries_count} countries) in {time.time() - ref_start:.2f}s")
-
-    # =========================================================================
-    # Phase 4: Load events (with extended fields)
-    # =========================================================================
+    # Load events - this now handles event_types, positions, play_patterns, and players
+    # via a staging table approach (single JSON scan instead of 5 separate scans)
     logger.info("Loading events with extended fields (this may take a few minutes)")
     events_start = time.time()
     event_count = schema.load_events(c)
     logger.info(f"Loaded {event_count} events in {time.time() - events_start:.2f}s")
+    
+    # Verify reference tables were populated
+    event_types_count = c.execute("SELECT COUNT(*) FROM event_types").fetchone()[0]
+    positions_count = c.execute("SELECT COUNT(*) FROM positions").fetchone()[0]
+    players_count = c.execute("SELECT COUNT(*) FROM players").fetchone()[0]
+    play_patterns_count = c.execute("SELECT COUNT(*) FROM play_patterns").fetchone()[0]
+    logger.info(f"Reference tables populated: {event_types_count} event types, {positions_count} positions, {players_count} players, {play_patterns_count} play patterns")
+    
+    logger.info(f"Reference tables and events loaded in {time.time() - ref_start:.2f}s")
 
     # =========================================================================
     # Phase 5: Load lineup data
