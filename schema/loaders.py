@@ -4,25 +4,16 @@ import glob
 from .utils import _get_player_name_case
 
 
-import concurrent.futures
-
 def _get_valid_json_files(pattern):
-    """Filter out malformed JSON files using parallel validation."""
-    files = glob.glob(pattern, recursive=True)
+    """Filter out malformed JSON files from a glob pattern."""
     valid_files = []
-    
-    def is_valid(f):
+    for f in glob.glob(pattern, recursive=True):
         try:
             with open(f, 'r') as file:
                 json.load(file)
-            return f
+            valid_files.append(f)
         except:
-            return None
-
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        results = executor.map(is_valid, files)
-        valid_files = [f for f in results if f is not None]
-        
+            continue
     return valid_files
 
 
@@ -47,17 +38,24 @@ def load_competitions(c):
 
 
 def load_teams(c):
-    """Load teams from match files using a single scan."""
+    """Load teams from match files."""
     c.execute("""
         INSERT INTO teams
-        SELECT DISTINCT team.id, team.name, team.gender
-        FROM (
-            SELECT 
-                {id: home_team.home_team_id, name: home_team.home_team_name, gender: home_team.home_team_gender} as t1,
-                {id: away_team.away_team_id, name: away_team.away_team_name, gender: away_team.away_team_gender} as t2
-            FROM read_json_auto('./open-data/data/matches/**/*.json', format='array')
-        ), UNNEST([t1, t2]) as t(team)
-        WHERE team.id IS NOT NULL;
+        SELECT DISTINCT 
+            home_team.home_team_id as id,
+            home_team.home_team_name as name,
+            home_team.home_team_gender as gender
+        FROM read_json_auto('./open-data/data/matches/**/*.json', format='array')
+        WHERE home_team.home_team_id IS NOT NULL
+        
+        UNION
+        
+        SELECT DISTINCT 
+            away_team.away_team_id as id,
+            away_team.away_team_name as name,
+            away_team.away_team_gender as gender
+        FROM read_json_auto('./open-data/data/matches/**/*.json', format='array')
+        WHERE away_team.away_team_id IS NOT NULL;
     """)
     return c.execute("SELECT COUNT(*) FROM teams").fetchone()[0]
 
@@ -106,30 +104,53 @@ def load_matches(c):
     return c.execute("SELECT COUNT(*) FROM matches").fetchone()[0]
 
 
-def load_reference_data(c):
-    """Load all reference data (event_types, positions, play_patterns, players) in a single pass."""
-    case_stmt = _get_player_name_case()
-    
-    # Create a temporary view of the raw event data to avoid multiple scans
+def load_event_types(c):
+    """Load event type reference data."""
     c.execute("""
-        CREATE TEMPORARY VIEW IF NOT EXISTS v_raw_events AS 
-        SELECT * FROM read_json_auto('./open-data/data/events/*.json', format='array');
+        INSERT INTO event_types
+        SELECT DISTINCT 
+            type.id,
+            type.name
+        FROM read_json_auto('./open-data/data/events/*.json', format='array')
+        WHERE type.id IS NOT NULL;
     """)
-    
-    # Event types
-    c.execute("INSERT INTO event_types SELECT DISTINCT type.id, type.name FROM v_raw_events WHERE type.id IS NOT NULL;")
-    
-    # Positions
-    c.execute("INSERT INTO positions SELECT DISTINCT position.id, position.name FROM v_raw_events WHERE position.id IS NOT NULL;")
-    
-    # Play patterns
-    c.execute("INSERT INTO play_patterns SELECT DISTINCT play_pattern.id, play_pattern.name FROM v_raw_events WHERE play_pattern.id IS NOT NULL;")
-    
-    # Players
-    c.execute(f"INSERT INTO players SELECT DISTINCT player.id, {case_stmt} as name FROM v_raw_events WHERE player.id IS NOT NULL;")
-    
-    # Cleanup view
-    c.execute("DROP VIEW v_raw_events;")
+
+
+def load_positions(c):
+    """Load position reference data."""
+    c.execute("""
+        INSERT INTO positions
+        SELECT DISTINCT 
+            position.id,
+            position.name
+        FROM read_json_auto('./open-data/data/events/*.json', format='array')
+        WHERE position.id IS NOT NULL;
+    """)
+
+
+def load_play_patterns(c):
+    """Load play pattern reference data."""
+    c.execute("""
+        INSERT INTO play_patterns
+        SELECT DISTINCT 
+            play_pattern.id,
+            play_pattern.name
+        FROM read_json_auto('./open-data/data/events/*.json', format='array')
+        WHERE play_pattern.id IS NOT NULL;
+    """)
+
+
+def load_players(c):
+    """Load player reference data with canonicalized names."""
+    case_stmt = _get_player_name_case()
+    c.execute(f"""
+        INSERT INTO players
+        SELECT DISTINCT 
+            player.id,
+            {case_stmt} as name
+        FROM read_json_auto('./open-data/data/events/*.json', format='array')
+        WHERE player.id IS NOT NULL;
+    """)
 
 
 def load_countries(c):
