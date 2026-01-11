@@ -223,10 +223,11 @@ class TestDomainSpecificSoccerValidation:
         "Center Midfield",
         "Left Center Midfield",
         "Right Center Midfield",
-        "Left Forward",
-        "Right Forward",
+        "Left Center Forward",
+        "Right Center Forward",
         "Center Forward",
-        "Striker",
+        "Secondary Striker",
+        "Substitute",
     ]
 
     EXPECTED_PLAY_PATTERNS = [
