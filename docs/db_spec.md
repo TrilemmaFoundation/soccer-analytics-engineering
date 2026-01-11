@@ -10,7 +10,7 @@ This document provides a comprehensive specification for the StatsBomb DuckDB da
 - **Database File**: `stats.duckdb` (created by `build.py`)
 - **Data Source**: StatsBomb Open Data repository
 - **License**: CC BY-NC 4.0 (Creative Commons Attribution-NonCommercial)
-- **Schema Version**: Defined in `schema.py`
+- **Schema Version**: Defined in `schema/tables.py`
 
 ## Database Schema
 
@@ -28,6 +28,10 @@ This document provides a comprehensive specification for the StatsBomb DuckDB da
 | `gender`              | TEXT    |                                | Competition gender (male/female) |
 | `is_youth`            | BOOLEAN |                                | Youth competition flag         |
 | `is_international`    | BOOLEAN |                                | International competition flag |
+| `country_name`        | TEXT    |                                | Country name                   |
+| `season_name`         | TEXT    |                                | Season name (e.g. "2023/2024") |
+| `match_updated`       | TEXT    |                                | Last competition update time   |
+| `match_available_360` | TEXT    |                                | Availability of 360 tracking data |
 
 **Primary Key**: (`competition_id`, `season_id`)
 
@@ -114,12 +118,19 @@ Common event types include: Pass, Shot, Carry, Dribble, Pressure, Ball Recovery,
 
 **Purpose**: Maps play pattern IDs to names
 
-| Column | Type    | Constraints | Description        |
-| ------ | ------- | ----------- | ------------------ |
 | `id`   | INTEGER | PRIMARY KEY | Play pattern ID    |
 | `name` | TEXT    |             | Play pattern name   |
 
-#### 8. `events` - Match Events
+#### 8. `countries` - Country Lookup
+
+**Purpose**: Maps country IDs to names
+
+| Column | Type    | Constraints | Description |
+| ------ | ------- | ----------- | ----------- |
+| `id`   | INTEGER | PRIMARY KEY | Country ID  |
+| `name` | TEXT    |             | Country name |
+
+#### 9. `events` - Match Events
 
 **Purpose**: Detailed event data for all matches (passes, shots, tackles, etc.)
 
@@ -161,6 +172,9 @@ Common event types include: Pass, Shot, Carry, Dribble, Pressure, Ball Recovery,
 | Column                  | Type        | Description                              |
 | ----------------------- | ----------- | ---------------------------------------- |
 | `shot_end_location`     | TEXT (JSON) | Shot target [x, y, z]                    |
+| `shot_end_location_x`   | REAL        | Shot end X coordinate                    |
+| `shot_end_location_y`   | REAL        | Shot end Y coordinate                    |
+| `shot_end_location_z`   | REAL        | Shot end Z coordinate                    |
 | `shot_statsbomb_xg`     | REAL        | Expected goals value (0.0-1.0)           |
 | `shot_outcome`          | TEXT        | Shot result (Goal, Saved, Blocked, etc.) |
 | `shot_technique`        | TEXT        | Shot technique (Normal, Volley, etc.)    |
@@ -217,6 +231,66 @@ Common event types include: Pass, Shot, Carry, Dribble, Pressure, Ball Recovery,
 | `carry_end_location_x`  | REAL        | Carry end X coordinate      |
 | `carry_end_location_y`  | REAL        | Carry end Y coordinate      |
 
+##### Dribble Attributes
+| Column | Type | Description |
+| --- | --- | --- |
+| `dribble_overrun` | BOOLEAN | Dribbled ball too far flag |
+| `dribble_nutmeg` | BOOLEAN | Nutmeg flag |
+| `dribble_outcome` | TEXT | Result (Complete, Incomplete) |
+| `dribble_no_touch` | BOOLEAN | Dribbled without touching ball flag |
+
+##### Duel Attributes
+| Column | Type | Description |
+| --- | --- | --- |
+| `duel_type` | TEXT | Duel type (Tackle, Aerial Lost, etc.) |
+| `duel_outcome` | TEXT | Duel result (Won, Lost, Neutral, etc.) |
+
+##### Foul Attributes
+| Column | Type | Description |
+| --- | --- | --- |
+| `foul_committed_offensive` | BOOLEAN | Offensive foul flag |
+| `foul_committed_type` | TEXT | Foul type (Handball, Professional, etc.) |
+| `foul_committed_advantage` | BOOLEAN | Advantage played flag |
+| `foul_committed_penalty` | BOOLEAN | Penalty conceded flag |
+| `foul_committed_card` | TEXT | Card issued (Yellow, Red, etc.) |
+| `foul_won_advantage` | BOOLEAN | Advantage won flag |
+| `foul_won_penalty` | BOOLEAN | Penalty won flag |
+| `foul_won_defensive` | BOOLEAN | Defensive foul won flag |
+
+##### Goalkeeper Attributes
+| Column | Type | Description |
+| --- | --- | --- |
+| `goalkeeper_type` | TEXT | Action type (Save, Punch, etc.) |
+| `goalkeeper_outcome` | TEXT | Action result (Success, Failure, etc.) |
+| `goalkeeper_body_part` | TEXT | Body part used |
+| `goalkeeper_technique` | TEXT | Technique (Diving, Standing, etc.) |
+| `goalkeeper_position` | TEXT | GK position (Set, Moving, etc.) |
+| `goalkeeper_end_location` | TEXT (JSON) | Action end location [x, y] |
+| `goalkeeper_end_location_x` | REAL | Action end X coordinate |
+| `goalkeeper_end_location_y` | REAL | Action end Y coordinate |
+
+##### Other Event Attributes
+| Column | Category | Type | Description |
+| --- | --- | --- | --- |
+| `clearance_aerial_won` | Clearance | BOOLEAN | Aerial duel won during clearance |
+| `clearance_body_part` | Clearance | TEXT | Body part used for clearance |
+| `clearance_head` | Clearance | BOOLEAN | Headed clearance flag |
+| `clearance_left_foot` | Clearance | BOOLEAN | Left foot used flag |
+| `clearance_right_foot` | Clearance | BOOLEAN | Right foot used flag |
+| `interception_outcome` | Interception | TEXT | Interception result |
+| `block_deflection` | Block | BOOLEAN | Shot deflection flag |
+| `block_offensive` | Block | BOOLEAN | Offensive block flag |
+| `block_save_block` | Block | BOOLEAN | Save block flag |
+| `ball_recovery_offensive` | Ball Recovery | BOOLEAN | Offensive recovery flag |
+| `ball_recovery_failure` | Ball Recovery | BOOLEAN | Recovery failure flag |
+| `miscontrol_aerial_won` | Miscontrol | BOOLEAN | Aerial duel won during miscontrol |
+| `substitution_replacement_id` | Substitution | INTEGER | Replacement player ID |
+| `substitution_replacement_name` | Substitution | TEXT | Replacement player name |
+| `substitution_outcome` | Substitution | TEXT | Substitution result |
+| `fifty_fifty_outcome` | 50/50 | TEXT | 50/50 result |
+| `bad_behaviour_card` | Bad Behaviour | TEXT | Card for bad behaviour |
+| `injury_stoppage_in_chain` | Injury Stoppage | BOOLEAN | In-possession injury flag |
+
 **Foreign Keys**:
 - `type_id` → `event_types(id)`
 - `match_id` → `matches(match_id)`
@@ -225,6 +299,81 @@ Common event types include: Pass, Shot, Carry, Dribble, Pressure, Ball Recovery,
 - `position_id` → `positions(id)`
 - `possession_team_id` → `teams(id)`
 - `pass_recipient_id` → `players(id)`
+
+### Lineup Tables
+
+#### 10. `lineups` - Match-Team Lineup Relationships
+**Purpose**: Links teams to matches for roster tracking.
+| Column | Type | Constraints | Description |
+| --- | --- | --- | --- |
+| `match_id` | INTEGER | PRIMARY KEY, FK | Reference to matches |
+| `team_id` | INTEGER | PRIMARY KEY, FK | Reference to teams |
+| `team_name` | TEXT | | Team name |
+
+#### 11. `lineup_players` - Match-Team Player Rosters
+**Purpose**: Individual player entries for each match lineup.
+| Column | Type | Constraints | Description |
+| --- | --- | --- | --- |
+| `match_id` | INTEGER | PRIMARY KEY, FK | Reference to lineups |
+| `team_id` | INTEGER | PRIMARY KEY, FK | Reference to lineups |
+| `player_id` | INTEGER | PRIMARY KEY | Player ID |
+| `player_name` | TEXT | | Full player name |
+| `player_nickname`| TEXT | | Player nickname |
+| `jersey_number` | INTEGER | | Match jersey number |
+| `country_id` | INTEGER | | Country ID |
+| `country_name` | TEXT | | Country name |
+
+#### 12. `lineup_positions` - Dynamic Position Changes
+**Purpose**: Tracks where players actually played during a match.
+| Column | Type | Description |
+| --- | --- | --- |
+| `id` | INTEGER | Primary Key (Auto-increment) |
+| `match_id` | INTEGER | Reference to lineups |
+| `team_id` | INTEGER | Reference to lineups |
+| `player_id` | INTEGER | Player ID |
+| `position_id` | INTEGER | Position ID |
+| `position_name` | TEXT | Position name |
+| `from_time` | TEXT | Start time (MM:SS) |
+| `to_time` | TEXT | End time (MM:SS) |
+| `from_period` | INTEGER | Start period |
+| `to_period` | INTEGER | End period |
+| `start_reason` | TEXT | Reason for starting position |
+| `end_reason` | TEXT | Reason for ending position |
+
+#### 13. `lineup_cards` - Match Discipline
+**Purpose**: Record of cards issued during a match.
+| Column | Type | Description |
+| --- | --- | --- |
+| `id` | INTEGER | Primary Key (Auto-increment) |
+| `match_id` | INTEGER | Reference to lineups |
+| `team_id` | INTEGER | Reference to lineups |
+| `player_id` | INTEGER | Player ID |
+| `card_time` | TEXT | Time of card |
+| `card_type` | TEXT | Yellow, Red, etc. |
+| `reason` | TEXT | Reason for card |
+| `period` | INTEGER | Match period |
+
+### 360 Tracking Data Tables
+
+#### 14. `three_sixty_frames` - Frame Metadata
+**Purpose**: Metadata for 360 tracking frames.
+| Column | Type | Description |
+| --- | --- | --- |
+| `event_uuid` | TEXT | PRIMARY KEY, FK | Reference to events |
+| `match_id` | INTEGER | | Match ID |
+| `visible_area` | TEXT (JSON) | Polygon coordinates of camera view |
+
+#### 15. `three_sixty_positions` - Player Tracking Positions
+**Purpose**: High-resolution spatial data for players at moment of event.
+| Column | Type | Description |
+| --- | --- | --- |
+| `id` | INTEGER | Primary Key (Auto-increment) |
+| `event_uuid` | TEXT | FK | Reference to three_sixty_frames |
+| `teammate` | BOOLEAN | Is teammate of event actor |
+| `actor` | BOOLEAN | Is event actor |
+| `keeper` | BOOLEAN | Is goalkeeper |
+| `location_x` | REAL | Player X coordinate |
+| `location_y` | REAL | Player Y coordinate |
 
 ## Data Types and Conventions
 
@@ -259,7 +408,7 @@ All boolean values are stored as BOOLEAN type:
 
 ## Indexes
 
-The database includes 7 indexes created by `schema.create_indexes()` to optimize query performance:
+The database includes 17 indexes created by `schema/indexes.py` to optimize query performance:
 
 ### Events Table Indexes
 
@@ -269,6 +418,7 @@ The database includes 7 indexes created by `schema.create_indexes()` to optimize
 | `idx_events_player` | `player_id` | Fast player-based queries |
 | `idx_events_type` | `type_id` | Fast filtering by event type |
 | `idx_events_team` | `team_id` | Fast team-based queries |
+| `idx_events_possession` | `possession_team_id` | Rapid possession sequence retrieval |
 
 ### Matches Table Indexes
 
@@ -277,6 +427,25 @@ The database includes 7 indexes created by `schema.create_indexes()` to optimize
 | `idx_matches_competition` | `competition_id`, `season_id` | Fast filtering by competition/season |
 | `idx_matches_home_team` | `home_team_id` | Fast home team lookups |
 | `idx_matches_away_team` | `away_team_id` | Fast away team lookups |
+| `idx_matches_date` | `match_date` | Fast sorting and filtering by match date |
+
+### Lineup Table Indexes
+
+| Index Name | Columns | Purpose |
+|------------|---------|---------|
+| `idx_lineup_players_match` | `match_id` | Fast roster retrieval per match |
+| `idx_lineup_players_player`| `player_id` | Track player history across matches |
+| `idx_lineup_positions_match`| `match_id` | Fast position history lookup |
+| `idx_lineup_positions_player`| `player_id` | Track player position history |
+| `idx_lineup_cards_match` | `match_id` | Disciplinary analysis per match |
+| `idx_lineup_cards_player`| `player_id` | Track player discipline history |
+
+### 360 Tracking Indexes
+
+| Index Name | Columns | Purpose |
+|------------|---------|---------|
+| `idx_360_frames_match` | `match_id` | Fast tracking data retrieval per match |
+| `idx_360_positions_event` | `event_uuid` | Rapid retrieval of freeze frames per event |
 
 These indexes are automatically created during the database build process and significantly improve query performance for common access patterns.
 

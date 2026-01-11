@@ -10,8 +10,8 @@ This repository provides a robust ETL pipeline that transforms raw StatsBomb JSO
 
 ### Key Features
 - **High Performance**: Leverages DuckDB's columnar storage for lightning-fast queries.
-- **Normalized Schema**: 8 core tables with full referential integrity.
-- **Data Enrichment**: Integrated player canonicalization and coordinate extraction.
+- **Normalized Schema**: 15 core tables with full referential integrity.
+- **Data Enrichment**: Integrated player canonicalization, 360 tracking data support, and dynamic lineup tracking.
 - **Comprehensive Testing**: Validated with a suite of ~100 data integrity and quality tests.
 
 ---
@@ -27,6 +27,8 @@ graph TD
         COMP[competitions.json]
         MATCH[matches/*.json]
         EVENT[events/*.json]
+        LINEUP[lineups/*.json]
+        THREE60[three-sixty/*.json]
     end
 
     subgraph "ETL Pipeline ⚙️"
@@ -49,6 +51,8 @@ graph TD
     COMP --> BUILD
     MATCH --> BUILD
     EVENT --> BUILD
+    LINEUP --> BUILD
+    THREE60 --> BUILD
     
     SCHEMA --> BUILD
     BUILD --> DB
@@ -122,14 +126,27 @@ GROUP BY 1
 ORDER BY 3 DESC;
 ```
 
+#### Advanced 360 Tracking Analysis
+Find player positions during a specific shot:
+```sql
+SELECT 
+    e.player, 
+    e.type, 
+    p.location_x, 
+    p.location_y, 
+    p.teammate
+FROM events e
+JOIN three_sixty_positions p ON e.id = p.event_uuid
+WHERE e.type = 'Shot' AND e.match_id = 3788741;
+```
+
 ---
 
 ## 📚 Documentation
 
 For deep dives into the engineering and data structure, refer to the following:
 
-- 📑 **[DATABASE_SPECIFICATION.md](DATABASE_SPECIFICATION.md)**: Detailed schema, table definitions, and indexing strategy.
-- ⚙️ **[ENGINEERING_SPECIFICATION.md](ENGINEERING_SPECIFICATION.md)**: Data sources, normalization logic, and modeling assumptions.
+- 📑 **[db_spec.md](db_spec.md)**: Detailed schema, table definitions, and indexing strategy.
 
 ---
 
