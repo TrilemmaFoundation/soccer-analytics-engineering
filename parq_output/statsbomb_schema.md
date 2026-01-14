@@ -92,3 +92,13 @@ This document specifies the schema for the denormalized Parquet files stored in 
 | `id` | INTEGER | Original unique ID from the lookup table |
 | `name` | VARCHAR | The human-readable name of the entity |
 | `extra_info` | VARCHAR | Additional metadata (e.g., team gender) |
+
+---
+
+## 📜 License & Attribution
+
+- **Data Source**: StatsBomb Open Data
+- **License**: [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)
+- **Usage**: Usage of StatsBomb Open Data is subject to their license (non-commercial use only, attribution required).
+- **Citation**: "StatsBomb Open Data"
+
